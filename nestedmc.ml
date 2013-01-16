@@ -1,19 +1,8 @@
 
-module type GAME =
-sig
-  type node
-  type action
-  val play : node -> action -> node
-  val random_move : node -> action
-  val possible_moves : node -> action list
-  val terminal : node -> bool
-  val score : node -> int
-  val init : node
-end
 
 exception InvalidMove
 
-module MonteCarlo ( Game : GAME ) =
+module MonteCarlo ( Game : AI.GAME ) =
 struct
 
   open Game
@@ -24,13 +13,14 @@ struct
       let action = random_move node in
       random_play ~moves:(action :: moves) (play node action)
 
+  type score = int
 
-  let rec nestedmc ?(moves = []) node lv =
+  let rec nestedmc ?(moves:Game.action list = []) node lv : score * Game.action list =
     if lv = 0 then
       random_play node
     else
-      let try_move move =
-	nestedmc ~moves:[move::moves] (play node move) (lv-1)
+      let try_move (move : Game.action) : int * Game.action list=
+	nestedmc ~moves:(move::moves) (play node move) (lv-1)
       in
       List.fold_left max (-1, [])
 	(List.rev_map try_move (possible_moves node))
