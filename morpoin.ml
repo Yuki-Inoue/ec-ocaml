@@ -54,17 +54,16 @@ sig
   val margin : int
 end
 
+type cordinate_type = Node | Line
 
+module CordinateSet
+  = Set.Make( struct
+    type t = (int * int) * cordinate_type
+    let compare = compare
+  end )
 
 module DirView (Param : PARAM) : VIEW =
 struct
-
-  type cordinate_type = Node | Line
-
-  module CordinateSet
-    = Set.Make(
-      struct type t = (int * int) * cordinate_type let compare = compare end
-    )
 
   type t = (module CORDINATE) * CordinateSet.t
 
