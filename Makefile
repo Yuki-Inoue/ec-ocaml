@@ -1,13 +1,14 @@
 
 
-.PHONY: batches clean
+.PHONY: all
 
-batches: morpoin.cmo nestedmc.cmo
-morpoin.cmo: AI.cmo
+all: morpoin.cmo
 
+morpoin.cmo : AIGame.cmo morpoin.cmi
 
 %.cmi : %.mli
 	ocamlc -c $<
+
 %.cmo : %.ml
 	ocamlc -c $<
 

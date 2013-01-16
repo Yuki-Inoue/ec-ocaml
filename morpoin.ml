@@ -45,6 +45,8 @@ sig
   val playable : (int * int) -> t -> bool
   val move_exist : t -> bool
   val node_size : t -> int
+  val first_range : t -> int * int
+  val node_exist : (int * int) -> t -> bool
 end
 
 
@@ -197,6 +199,15 @@ struct
 	  | Line -> total)
       t 0
 
+  let first_range (_,cordinate_set) =
+    fst (fst (CordinateSet.min_elt cordinate_set)),
+    fst (fst (CordinateSet.max_elt cordinate_set))
+
+  let node_exist cor (cordinate, cordinate_set) =
+    let module Cordinate = (val cordinate : CORDINATE) in
+    let cor = Cordinate.make cor in
+    CordinateSet.mem (cor,Node) cordinate_set
+
 end
 
 module type S =
@@ -209,6 +220,7 @@ sig
   val terminal : node -> bool
   val score : node -> int
   val initial : node
+  val print : node -> unit
 end
 
 (* satisfied AI.GAME *)
@@ -237,7 +249,7 @@ struct
 
   let play node ((dir,cordinate) as action :action) =
     if not (DirView.playable cordinate (List.nth node dir)) then
-      raise AI.InvalidAction
+      raise AIGame.InvalidAction
     else
       add_line action (add_node cordinate node)
 
@@ -299,6 +311,27 @@ struct
 	  ans := add_node (i,j) !ans))
       arr;
     !ans
+
+  let print view_list =
+    let hd_view = List.hd view_list in
+    let (first_begin, first_end) =
+      DirView.first_range hd_view
+    in
+    let (second_begin, second_end) =
+      DirView.first_range (List.nth view_list 2)
+    in
+    let ox_of_bool b = match b with
+	true -> 'o'
+      | false -> 'x'
+    in
+    for i = first_begin to first_end do
+      for j = second_begin to second_end do
+	print_char
+	  (ox_of_bool
+	     (DirView.node_exist (i,j) hd_view))
+      done;
+      print_newline ()
+    done
 
 end
 

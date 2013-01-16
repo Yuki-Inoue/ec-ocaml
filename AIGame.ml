@@ -1,7 +1,7 @@
 
 exception InvalidAction
 
-module type GAME =
+module type S =
 sig
   type node
   type action

@@ -1,2 +1,5 @@
 #load_rec "morpoin.cmo"
-#load_rec "nestedmc.cmo"
+
+#install_printer Morpoin.T.print
+
+open Morpoin.T
