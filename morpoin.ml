@@ -200,10 +200,21 @@ struct
 
 end
 
-
+module type S =
+sig
+  type node
+  type action
+  val play : node -> action -> node
+  val random_move : node -> action
+  val possible_moves : node -> action list
+  val terminal : node -> bool
+  val score : node -> int
+  val initial : node
+end
 
 (* satisfied AI.GAME *)
-module Morpoin (Param: PARAM) =
+module Make (Param: PARAM)
+  : S =
 struct
   module DirView = DirView(Param)
   type dir = int
@@ -292,29 +303,19 @@ struct
 
 end
 
-module AttachedParam =
+module AttachedParam : PARAM =
 struct
   let connects = 5
   let margin = 4
 end
 
-module DetachedParam =
+module DetachedParam : PARAM =
 struct
   let connects = 5
-  let margin = 4
+  let margin = 5
 end
 
-module type MORPOIN =
-sig
-  type node
-  type action
-  val play : node -> action -> node
-  val random_move : node -> action
-  val possible_moves : node -> action list
-  val terminal : node -> bool
-  val score : node -> int
-  val initial : node
-end
 
-module MorpoinT : MORPOIN = Morpoin(AttachedParam)
-module MorpoinD : MORPOIN = Morpoin(DetachedParam)
+
+module T : S = Make(AttachedParam)
+module D : S = Make(DetachedParam)
