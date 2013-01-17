@@ -1,5 +1,8 @@
 #load_rec "morpoin.cmo"
 
-#install_printer Morpoin.T.print
+#install_printer Morpoin.T.print_node
+#install_printer Morpoin.T.print_action
 
 open Morpoin.T
+
+#use "test.ml";;

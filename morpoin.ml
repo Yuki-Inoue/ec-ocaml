@@ -220,7 +220,8 @@ sig
   val terminal : node -> bool
   val score : node -> int
   val initial : node
-  val print : node -> unit
+  val print_node : Format.formatter -> node -> unit
+  val print_action : Format.formatter -> action -> unit
 end
 
 (* satisfied AI.GAME *)
@@ -232,6 +233,11 @@ struct
   type cordinate = int * int
   type node = DirView.t list
   type action = dir * cordinate
+
+  let print_action formatter (dir, (x,y) : action) =
+    Format.pp_print_string
+      formatter
+      (Printf.sprintf "(dir%i:(%i,%i))" dir x y)
 
   let add_node cordinate views =
     List.mapi
@@ -312,7 +318,7 @@ struct
       arr;
     !ans
 
-  let print view_list =
+  let print_node formatter view_list =
     let hd_view = List.hd view_list in
     let (first_begin, first_end) =
       DirView.first_range hd_view
@@ -324,14 +330,16 @@ struct
 	true -> 'o'
       | false -> 'x'
     in
+    Format.pp_open_vbox formatter 0;
     for i = first_begin to first_end do
       for j = second_begin to second_end do
-	print_char
+	Format.pp_print_char formatter
 	  (ox_of_bool
 	     (DirView.node_exist (i,j) hd_view))
       done;
-      print_newline ()
-    done
+      Format.pp_print_cut formatter ()
+    done;
+    Format.pp_close_box formatter ()
 
 end
 

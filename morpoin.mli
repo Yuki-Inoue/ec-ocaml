@@ -15,7 +15,8 @@ sig
   val terminal : node -> bool
   val score : node -> int
   val initial : node
-  val print : node -> unit
+  val print_node : Format.formatter -> node -> unit
+  val print_action : Format.formatter -> action -> unit
 end
 
 module Make : functor (Param : PARAM) -> S
