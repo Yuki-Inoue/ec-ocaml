@@ -240,12 +240,12 @@ struct
       (Printf.sprintf "(dir%i:(%i,%i))" dir x y)
 
   let add_node cordinate views =
-    List.mapi
-      (fun i view ->
+    List.map
+      (fun view ->
 	DirView.add_node cordinate view)
       views
 
-  let add_line (dir,cordinate) views =
+  let add_line (dir,cordinate : action) views =
     List.mapi (fun i view ->
       if i != dir then view
       else
