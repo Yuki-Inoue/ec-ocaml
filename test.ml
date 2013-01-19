@@ -5,3 +5,6 @@ let first_move_test = List.iteri
     Printf.printf "moving %ith move\n" i;
     ignore (play initial move))
   moves
+
+let nth i =
+  play initial (List.nth moves i)
