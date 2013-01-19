@@ -1,36 +1,63 @@
+module type CORDINATE_SYSTEM =
+sig
+  type 'a cordinate constraint 'a = [< `Global | `Local ]
+  type t = {
+    of_global : [`Global] cordinate -> [`Local] cordinate;
+    to_global : [`Local] cordinate -> [`Global] cordinate;
+    unit : int
+  }
+  val compare : 'a cordinate -> 'a cordinate -> int
+  val make : (int * int) -> 'a cordinate
+  val values : 'a cordinate -> (int * int)
+  val cordinate_systems : t array
+end
 
-type cordinate_system = {
-  of_global : (int * int) -> (int * int);
-  to_global : (int * int) -> (int * int);
-  unit : int
-}
+module CordinateSystem : CORDINATE_SYSTEM =
+struct
 
-let unit_of_cordinate_system cordinatesystem =
-  cordinatesystem.unit
+  type 'a cordinate = int * int
+  constraint 'a = [< `Global | `Local ]
 
-
-
-let first_cordinate =
-  let id x = x in {
-    of_global = id;
-    to_global = id;
-    unit = 1
+  type t = {
+    of_global : [`Global] cordinate -> [`Local] cordinate;
+    to_global : [`Local] cordinate -> [`Global] cordinate;
+    unit : int
   }
 
-let second_cordinate =
-  let of_global (x,y) = x-y, x+y in
-  let to_global (x,y) = (x+y)/2, (y-x)/2 in
-  { of_global; to_global; unit = 2 }
+  let make x = x
+  let values x = x
+  let compare = compare
+
+  let first_cordinate =
+    let id x = x in {
+      of_global = id;
+      to_global = id;
+      unit = 1
+    }
+
+  let second_cordinate =
+    let of_global (x,y) = x-y, x+y in
+    let to_global (x,y) = (x+y)/2, (y-x)/2 in
+    { of_global; to_global; unit = 2 }
 
 
-let third_cordinate =
-  let switch (x,y) = y,x in
-  { of_global = switch; to_global = switch; unit = 1 }
+  let third_cordinate =
+    let switch (x,y) = y,x in
+    { of_global = switch; to_global = switch; unit = 1 }
 
-let forth_cordinate =
-  let of_global (x,y) = x+y, x-y in
-  let to_global (x,y) = (x+y)/2, (x-y)/2 in
-  { of_global; to_global; unit = 2}
+  let forth_cordinate =
+    let of_global (x,y) = x+y, x-y in
+    let to_global (x,y) = (x+y)/2, (x-y)/2 in
+    { of_global; to_global; unit = 2}
+
+
+  let cordinate_systems =
+    [|first_cordinate;
+      second_cordinate;
+      third_cordinate;
+      forth_cordinate|]
+
+end
 
 
 type entity_type = Node | Line
