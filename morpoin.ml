@@ -1,44 +1,50 @@
 
-module type CORDINATE =
-sig
-  val make : (int * int) -> (int * int)
-  val unmake : (int * int) -> (int * int)
-  val unit : int
-end
+type cordinate_system = {
+  of_global : (int * int) -> (int * int);
+  to_global : (int * int) -> (int * int);
+  unit : int
+}
 
-module FirstCordinate : CORDINATE =
-struct
-  let make x = x
-  let unmake x = x
-  let unit = 1
-end
+let unit_of_cordinate_system cordinatesystem =
+  cordinatesystem.unit
 
-module SecondCordinate : CORDINATE=
-struct
-  let make (x,y) = (x-y, x+y)
-  let unmake (x,y) = (x+y)/2, (y-x)/2
-  let unit = 2
-end
 
-module ThirdCordinate : CORDINATE =
-struct
-  let make (x,y) = (y,x)
-  let unmake = make
-  let unit = 1
-end
 
-module ForthCordinate : CORDINATE =
-struct
-  let make (x,y) = (x+y, x-y)
-  let unmake (x,y) = (x+y)/2, (x-y)/2
-  let unit = 2
-end
+let first_cordinate =
+  let id x = x in {
+    of_global = id;
+    to_global = id;
+    unit = 1
+  }
 
+let second_cordinate =
+  let of_global (x,y) = x-y, x+y in
+  let to_global (x,y) = (x+y)/2, (y-x)/2 in
+  { of_global; to_global; unit = 2 }
+
+
+let third_cordinate =
+  let switch (x,y) = y,x in
+  { of_global = switch; to_global = switch; unit = 1 }
+
+let forth_cordinate =
+  let of_global (x,y) = x+y, x-y in
+  let to_global (x,y) = (x+y)/2, (x-y)/2 in
+  { of_global; to_global; unit = 2}
+
+
+type entity_type = Node | Line
+
+module EntitySet
+  = Set.Make( struct
+    type t = (int * int) * entity_type
+    let compare = compare
+  end )
 
 module type VIEW =
 sig
   type t
-  val make : (module CORDINATE) -> t
+  val make : cordinate_system -> t
   val add_node : (int * int) -> t -> t
   val add_line : (int * int) -> t -> t
   val possible_moves : t -> int * (int * int) list
@@ -56,50 +62,46 @@ sig
   val margin : int
 end
 
-type cordinate_type = Node | Line
 
-module CordinateSet
-  = Set.Make( struct
-    type t = (int * int) * cordinate_type
-    let compare = compare
-  end )
 
+
+(*
+  the 
+*)
 module DirView (Param : PARAM) : VIEW =
 struct
 
-  type t = (module CORDINATE) * CordinateSet.t
+  type t = {
+    cordinate_system : cordinate_system;
+    entities : EntitySet.t
+  }
 
-  let make cordinate =
-    cordinate, CordinateSet.empty
+  let make cordinate_system = {
+    cordinate_system;
+    entities = EntitySet.empty
+  }
 
-
-  let add_base cor (cordinate, cordinate_set) cor_type =
-    let module Cordinate = (val cordinate : CORDINATE) in
-    cordinate,
-    CordinateSet.add
-      ((Cordinate.make cor), cor_type)
-      cordinate_set
-
+  let add_base local_cordinate view cor_type = {
+    cordinate_system = view.cordinate_system;
+    entities =
+      EntitySet.add
+	(local_cordinate, cor_type)
+	view.entities
+  }
 
   let add_node node_cor view =
     add_base node_cor view Node
-
   let add_line line_cor view =
     add_base line_cor view Line
 
 
+  type calc_state =
+	NextAvailable of int * int
+      | ComparableNodes of (int * int) * (int * int) list
+  type node_type = Valid | Virtual
 
-  let possible_moves (cordinate, cordinate_set) =
-    let module Cordinate = (val cordinate : CORDINATE) in
-    let unit = Cordinate.unit in
-    let module CalcState = struct
-      type t =
-	  NextAvailable of int * int
-	| ComparableNodes of (int * int) * (int * int) list
-      type node_type = Valid | Virtual
-    end in
-    let open CalcState in
-
+  let possible_moves view =
+    let unit = view.cordinate_system.unit in
     let add_moves (x,y as top) revnodes (move_size, move_list) =
       let (top, rest) =
 	let rec insert_virtuals ret (x0,y0 as valid) revnodes =
@@ -136,7 +138,7 @@ struct
 	    let (cor, validity) = buffer.(!index) in
 	    if !valid_size = pred Param.connects
 	    then begin
-	      ret := Cordinate.unmake cor::!ret;
+	      ret := cor::!ret;
 	      incr ret_size
 	    end;
 	    if validity = Valid then decr valid_size
@@ -152,7 +154,7 @@ struct
     in
 
     let (last_state, moves) =
-      CordinateSet.fold
+      EntitySet.fold
 	(fun elm (state, moves as current) ->
 	  match state, elm with
 	      NextAvailable _, (_, Line) ->
@@ -168,19 +170,18 @@ struct
 	        ComparableNodes (c1, []), state >> moves
 	    | ComparableNodes (c,nodes), (node, Node) ->
 	        ComparableNodes (node,c::nodes), moves)
-	cordinate_set
+	view.entities
 	(NextAvailable(min_int, min_int), (0,[]))
     in
     last_state >> moves
 
 
   (* cor is considered to designate the front of line *)
-  let playable cor (cordinate, cordinate_set) =
-    let module Cordinate = (val cordinate : CORDINATE) in
-    let (x,y) = Cordinate.make cor in
+  let playable (x,y) view =
+    let unit = view.cordinate_system.unit in
     let count = ref 0 in
     for i = 0 to pred Param.connects do
-      if CordinateSet.mem ((x, y+i*Cordinate.unit),Node) cordinate_set
+      if EntitySet.mem ((x, y+i*unit),Node) view.entities
       then incr count
     done;
     !count = pred Param.connects
@@ -191,22 +192,20 @@ struct
     fst (possible_moves t) = 0
 
 
-  let node_size (_,t) =
-    CordinateSet.fold
+  let node_size view =
+    EntitySet.fold
       (fun (_,cord_type) total ->
 	match cord_type with
 	    Node -> succ total
 	  | Line -> total)
-      t 0
+      view.entities 0
 
-  let first_range (_,cordinate_set) =
-    fst (fst (CordinateSet.min_elt cordinate_set)),
-    fst (fst (CordinateSet.max_elt cordinate_set))
+  let first_range view =
+    fst (fst (EntitySet.min_elt view.entities)),
+    fst (fst (EntitySet.max_elt view.entities))
 
-  let node_exist cor (cordinate, cordinate_set) =
-    let module Cordinate = (val cordinate : CORDINATE) in
-    let cor = Cordinate.make cor in
-    CordinateSet.mem (cor,Node) cordinate_set
+  let node_exist cor view =
+    EntitySet.mem (cor,Node) view.entities
 
 end
 
@@ -242,7 +241,7 @@ struct
   let add_node cordinate views =
     List.map
       (fun view ->
-	DirView.add_node cordinate view)
+	DirView.add_node (view.cordinate_system.of_global cordinate) view)
       views
 
   let add_line (dir,cordinate : action) views =
@@ -291,10 +290,10 @@ struct
     DirView.node_size (List.hd views)
 
   let empty =
-    [DirView.make (module FirstCordinate);
-     DirView.make (module SecondCordinate);
-     DirView.make (module ThirdCordinate);
-     DirView.make (module ForthCordinate)]
+    [DirView.make first_cordinate;
+     DirView.make second_cordinate;
+     DirView.make third_cordinate;
+     DirView.make forth_cordinate]
 
   let initial =
     let o = true in
