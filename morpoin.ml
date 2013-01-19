@@ -254,7 +254,8 @@ struct
 	  (List.nth views dir)) views
 
   let play node ((dir,cordinate) as action :action) =
-    if not (DirView.playable cordinate (List.nth node dir)) then
+    let dirview = List.nth node dir in
+    if not (DirView.playable cordinate dirview) then
       raise AIGame.InvalidAction
     else
       add_line action (add_node cordinate node)
