@@ -22,7 +22,7 @@ struct
       let try_move (move : Game.action) : int * Game.action list=
 	nestedmc ~moves:(move::moves) (play node move) (lv-1)
       in
-      List.fold_left max (-1, [])
+      List.fold_left max (min_int, [])
 	(List.rev_map try_move (possible_moves node))
 
 end
