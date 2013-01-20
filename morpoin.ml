@@ -397,13 +397,18 @@ struct
 
   let play node ((dir,cordinate) as action :action) =
     let dirview = node.(dir) in
-    let global_cordinate =
-      global_cordinate_of_view_cordinate cordinate dirview
-    in
     if not (DirView.playable cordinate dirview) then
       raise AIGame.InvalidAction
     else
-      add_line action (add_node global_cordinate node)
+      let insertion_cordinate =
+	DirView.insertion_node_of_line cordinate dirview
+      in
+      let insertion_global_cordinate =
+	global_cordinate_of_view_cordinate
+	  insertion_cordinate
+	  dirview
+      in
+      add_line action (add_node insertion_global_cordinate node)
 
   let random_move (node:node) =
     let dir_moves =
