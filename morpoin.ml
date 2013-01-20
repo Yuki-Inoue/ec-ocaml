@@ -417,7 +417,13 @@ struct
 
 
   let print_action formatter (dir, cord : action) =
-    let (x,y) = CordinateSystem.values cord in
+    let cordinate_system =
+      CordinateSystem.cordinate_systems.(dir)
+    in
+    let global_cordinate =
+      cordinate_system.CordinateSystem.to_global cord
+    in
+    let (x,y) = CordinateSystem.values global_cordinate in
     Format.pp_print_string
       formatter
       (Printf.sprintf "(dir%i:(%i,%i))" dir x y)
