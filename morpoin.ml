@@ -394,6 +394,7 @@ sig
   val initial : node
   val print_node : Format.formatter -> node -> unit
   val print_action : Format.formatter -> action -> unit
+  val string_of_action : action -> string
 end
 
 (* satisfied AI.GAME *)
@@ -415,8 +416,7 @@ struct
     (DirView.cordinate_system_of_view view).
       CordinateSystem.to_global local_cordinate
 
-
-  let print_action formatter (dir, cord : action) =
+  let string_of_action (dir, cord : action) =
     let cordinate_system =
       CordinateSystem.cordinate_systems.(dir)
     in
@@ -424,9 +424,14 @@ struct
       cordinate_system.CordinateSystem.to_global cord
     in
     let (x,y) = CordinateSystem.values global_cordinate in
+    Printf.sprintf "(dir%i:(%i,%i))" dir x y
+
+
+
+  let print_action formatter action =
     Format.pp_print_string
       formatter
-      (Printf.sprintf "(dir%i:(%i,%i))" dir x y)
+      (string_of_action action)
 
   let add_node global_cordinate views =
     Array.map
