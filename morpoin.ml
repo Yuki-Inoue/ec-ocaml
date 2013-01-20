@@ -90,9 +90,11 @@ sig
   val possible_moves : t -> size * [`Local] cordinate list
   val playable : [`Local] cordinate -> t -> bool
   val move_exist : t -> bool
-  val node_size : t -> int
+  val num_nodes : t -> int
+  val num_lines : t -> int
   val first_range : t -> int * int
   val node_exist : [`Local] cordinate -> t -> bool
+  val nodes : t -> [`Local] cordinate list
   val insertion_node_of_line : [`Local] cordinate -> t -> [`Local] cordinate
 end
 
@@ -114,6 +116,24 @@ struct
     entities : EntitySet.t
   }
 
+  let num_lines (_, entity_set : t) =
+    CordinateSet.fold
+      (fun (_,cordinate_type : CordinateSet.elt) (total_lines:int) ->
+	match cordinate_type with
+	    Line -> 1 + total_lines
+	  | Node -> total_lines)
+      entity_set 0
+
+
+
+  let nodes (cordinate,cordinate_set : t) =
+    let module Cordinate = (val cordinate) in
+    Cordinate.Set.fold
+      (fun (dir_cor, cor_type) ans_list ->
+	match cor_type with
+	  | Line -> ans_list
+	  | Node -> (Cordinate.unmake dir_cor)::ans_list)
+      cordinate_set []
 
 
   type dirview_t = t
@@ -401,6 +421,32 @@ struct
 	  cordinate
 	  views.(dir)) views
 
+  let num_nodes (views : node) =
+    DirView.num_nodes (List.hd views)
+
+  let num_lines (views : node) =
+    List.fold_left
+      (fun (total:int) view ->
+	total + DirView.num_lines view)
+      0 views
+
+  let rec elements_equal prev_hd l =
+    match l with
+	[] -> true
+      | hd::tl when hd = prev_hd -> elements_equal hd tl
+      | _ -> false
+
+
+  (* asserts that the arg node is sound *)
+  let verify_node (view_list : node) : bool =
+    match
+      List.rev_map
+	(fun view -> List.sort compare (DirView.nodes view))
+	view_list
+    with
+	[] -> false
+      | hd::tl -> elements_equal hd tl
+
   let play node ((dir,cordinate) as action :action) =
     let dirview = node.(dir) in
     if not (DirView.playable cordinate dirview) then
@@ -414,7 +460,11 @@ struct
 	  insertion_cordinate
 	  dirview
       in
-      add_line action (add_node insertion_global_cordinate node)
+      let ret = add_line action (add_node insertion_global_cordinate node) in
+      assert( verify_node node );
+      assert( succ (num_nodes node) = num_nodes ret );
+      assert( succ (num_lines node) = num_lines ret );
+      ret
 
   let random_move (node:node) =
     let dir_moves =
