@@ -1,6 +1,6 @@
 #load_rec "playMorpoin.cmo"
 
-#install_printer Morpoin.T.print_node
-#install_printer Morpoin.T.print_action
+#install_printer Morpoin.D.print_node
+#install_printer Morpoin.D.print_action
 
-open Morpoin.T
+open Morpoin.D
