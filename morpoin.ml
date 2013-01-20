@@ -80,6 +80,13 @@ module EntitySet
       else Pervasives.compare t1 t2
   end )
 
+
+module GlobalCordinateSet =
+  Set.Make (struct
+    type t = [`Global] CordinateSystem.cordinate
+    let compare = CordinateSystem.compare
+  end)
+
 module type VIEW =
 sig
   type t
@@ -94,7 +101,7 @@ sig
   val num_lines : t -> int
   val first_range : t -> int * int
   val node_exist : [`Local] cordinate -> t -> bool
-  val nodes : t -> [`Local] cordinate list
+  val nodes : t -> GlobalCordinateSet.t
   val insertion_node_of_line : [`Local] cordinate -> t -> [`Local] cordinate
 end
 
@@ -116,24 +123,33 @@ struct
     entities : EntitySet.t
   }
 
-  let num_lines (_, entity_set : t) =
-    CordinateSet.fold
-      (fun (_,cordinate_type : CordinateSet.elt) (total_lines:int) ->
-	match cordinate_type with
-	    Line -> 1 + total_lines
-	  | Node -> total_lines)
-      entity_set 0
+
+  let count_entities_by_type typ {entities; _} =
+    EntitySet.fold
+      (fun (_, elmtyp) count ->
+	if typ = elmtyp then succ count
+	else count)
+      entities 0
+
+  let num_lines view =
+    count_entities_by_type Line view
+
+  let num_nodes view =
+    count_entities_by_type Node view
 
 
-
-  let nodes (cordinate,cordinate_set : t) =
-    let module Cordinate = (val cordinate) in
-    Cordinate.Set.fold
-      (fun (dir_cor, cor_type) ans_list ->
-	match cor_type with
-	  | Line -> ans_list
-	  | Node -> (Cordinate.unmake dir_cor)::ans_list)
-      cordinate_set []
+  let nodes { entities; cordinate_system } =
+    EntitySet.fold
+      (fun elt global_cords ->
+	if snd elt = Line then
+	  global_cords
+	else
+	  GlobalCordinateSet.add
+	    (cordinate_system.CordinateSystem.to_global
+	       (fst elt))
+	    global_cords)
+      entities
+      GlobalCordinateSet.empty
 
 
   type dirview_t = t
@@ -422,10 +438,10 @@ struct
 	  views.(dir)) views
 
   let num_nodes (views : node) =
-    DirView.num_nodes (List.hd views)
+    DirView.num_nodes views.(0)
 
   let num_lines (views : node) =
-    List.fold_left
+    Array.fold_left
       (fun (total:int) view ->
 	total + DirView.num_lines view)
       0 views
@@ -438,14 +454,20 @@ struct
 
 
   (* asserts that the arg node is sound *)
-  let verify_node (view_list : node) : bool =
-    match
-      List.rev_map
-	(fun view -> List.sort compare (DirView.nodes view))
-	view_list
-    with
-	[] -> false
-      | hd::tl -> elements_equal hd tl
+  let verify_node (views : node) : bool =
+    let view_nodes = Array.map DirView.nodes views in
+    let all_same = ref true in
+    let index = ref 0 in
+    while !all_same && !index < 3 do
+      if not (GlobalCordinateSet.equal
+	    view_nodes.(!index)
+	    view_nodes.(!index+1)) then
+	all_same := false;
+      incr index
+    done;
+    !all_same
+
+
 
   let play node ((dir,cordinate) as action :action) =
     let dirview = node.(dir) in
@@ -503,7 +525,7 @@ struct
     List.exists DirView.move_exist (Array.to_list node)
 
   let score views =
-    DirView.node_size views.(0)
+    DirView.num_nodes views.(0)
 
   let empty =
     Array.map
