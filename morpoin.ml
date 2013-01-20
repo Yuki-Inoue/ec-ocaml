@@ -508,7 +508,7 @@ struct
     in
     let r = ref (Random.int totalmoves) in
     let index = ref 0 in
-    while fst dir_moves.(!index) < !r do
+    while fst dir_moves.(!index) <= !r do
       r := !r - fst dir_moves.(!index);
       incr index;
     done;
@@ -533,7 +533,7 @@ struct
 	 dir_possible_moves)
 
   let terminal node =
-    List.exists DirView.move_exist (Array.to_list node)
+    not (List.exists DirView.move_exist (Array.to_list node))
 
   let score views =
     DirView.num_nodes views.(0)
