@@ -11,6 +11,7 @@ sig
   val global_cordinate : (int * int) -> [`Global] cordinate
   val values : 'a cordinate -> (int * int)
   val cordinate_systems : t array
+  val up : 'a cordinate -> t -> 'a cordinate
 end
 
 module CordinateSystem : CORDINATE_SYSTEM =
@@ -58,6 +59,8 @@ struct
       second_cordinate;
       third_cordinate;
       forth_cordinate|]
+
+  let up (x,y) cordinate_system = (x, y+cordinate_system.unit)
 
 end
 
