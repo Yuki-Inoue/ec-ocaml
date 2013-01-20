@@ -80,6 +80,13 @@ module EntitySet
       else Pervasives.compare t1 t2
   end )
 
+
+module GlobalCordinateSet =
+  Set.Make (struct
+    type t = [`Global] CordinateSystem.cordinate
+    let compare = CordinateSystem.compare
+  end)
+
 module type VIEW =
 sig
   type t
@@ -90,9 +97,11 @@ sig
   val possible_moves : t -> size * [`Local] cordinate list
   val playable : [`Local] cordinate -> t -> bool
   val move_exist : t -> bool
-  val node_size : t -> int
+  val num_nodes : t -> int
+  val num_lines : t -> int
   val first_range : t -> int * int
   val node_exist : [`Local] cordinate -> t -> bool
+  val nodes : t -> GlobalCordinateSet.t
   val insertion_node_of_line : [`Local] cordinate -> t -> [`Local] cordinate
 end
 
@@ -114,6 +123,33 @@ struct
     entities : EntitySet.t
   }
 
+
+  let count_entities_by_type typ {entities; _} =
+    EntitySet.fold
+      (fun (_, elmtyp) count ->
+	if typ = elmtyp then succ count
+	else count)
+      entities 0
+
+  let num_lines view =
+    count_entities_by_type Line view
+
+  let num_nodes view =
+    count_entities_by_type Node view
+
+
+  let nodes { entities; cordinate_system } =
+    EntitySet.fold
+      (fun elt global_cords ->
+	if snd elt = Line then
+	  global_cords
+	else
+	  GlobalCordinateSet.add
+	    (cordinate_system.CordinateSystem.to_global
+	       (fst elt))
+	    global_cords)
+      entities
+      GlobalCordinateSet.empty
 
 
   type dirview_t = t
@@ -401,6 +437,38 @@ struct
 	  cordinate
 	  views.(dir)) views
 
+  let num_nodes (views : node) =
+    DirView.num_nodes views.(0)
+
+  let num_lines (views : node) =
+    Array.fold_left
+      (fun (total:int) view ->
+	total + DirView.num_lines view)
+      0 views
+
+  let rec elements_equal prev_hd l =
+    match l with
+	[] -> true
+      | hd::tl when hd = prev_hd -> elements_equal hd tl
+      | _ -> false
+
+
+  (* asserts that the arg node is sound *)
+  let verify_node (views : node) : bool =
+    let view_nodes = Array.map DirView.nodes views in
+    let all_same = ref true in
+    let index = ref 0 in
+    while !all_same && !index < 3 do
+      if not (GlobalCordinateSet.equal
+	    view_nodes.(!index)
+	    view_nodes.(!index+1)) then
+	all_same := false;
+      incr index
+    done;
+    !all_same
+
+
+
   let play node ((dir,cordinate) as action :action) =
     let dirview = node.(dir) in
     if not (DirView.playable cordinate dirview) then
@@ -414,7 +482,11 @@ struct
 	  insertion_cordinate
 	  dirview
       in
-      add_line action (add_node insertion_global_cordinate node)
+      let ret = add_line action (add_node insertion_global_cordinate node) in
+      assert( verify_node node );
+      assert( succ (num_nodes node) = num_nodes ret );
+      assert( succ (num_lines node) = num_lines ret );
+      ret
 
   let random_move (node:node) =
     let dir_moves =
@@ -453,7 +525,7 @@ struct
     List.exists DirView.move_exist (Array.to_list node)
 
   let score views =
-    DirView.node_size views.(0)
+    DirView.num_nodes views.(0)
 
   let empty =
     Array.map
