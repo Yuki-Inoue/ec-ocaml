@@ -248,6 +248,22 @@ struct
 	    [{cordinate = x, y+unit; node_exist = false}]
 	    c cs
 
+    let eligible_for_line token_list =
+      List.fold_left
+	(fun count token ->
+	  if token.node_exist
+	  then succ count
+	  else count)
+	0 token_list = pred Param.connects
+
+    let popped_and_queue_eligible popped queue =
+      eligible_for_line
+	(popped ::
+	   (List.rev
+	      (Queue.fold
+		 (fun obj elm -> elm :: obj)
+		 [] queue)))
+
 
     (* queue: sized less than Param.connects *)
     let rec add_tokens_base node_count queue tokens sized_list =
@@ -260,14 +276,16 @@ struct
 	  if node_exist then incr node_count;
 	  if Queue.length queue = Param.connects then begin
 	    let popped = Queue.pop queue in
-	    if !node_count = Param.connects - 1 then
+	    if !node_count = Param.connects - 1 then begin
+	      assert (popped_and_queue_eligible popped queue);
 	      newlist := {
 		size =
 		  succ sized_list.size;
 		content =
 		  CordinateSystem.local_cordinate
 		    popped.cordinate :: sized_list.content
-	      };
+	      }
+	    end;
 	    if popped.node_exist then decr node_count
 	  end;
 	  add_tokens_base !node_count queue rest_of_tokens !newlist
@@ -278,9 +296,30 @@ struct
       add_tokens_base 0 (Queue.create ()) tokens list
 
 
+    let tokens_adjacent ~unit smaller bigger =
+      let (x0,y0) = smaller.cordinate in
+      let (x1,y1) = bigger.cordinate in
+      x0 = x1 && y0 + unit = y1
+
+
+    let rec valid_tokens_base ~unit top_token rest_tokens =
+      match rest_tokens with
+	  [] -> true
+	| hd_token::tail_tokens ->
+	  (top_token.node_exist || hd_token.node_exist)
+	  && tokens_adjacent ~unit top_token hd_token
+	  && valid_tokens_base ~unit hd_token tail_tokens
+
+    let valid_tokens ~unit tokens =
+      match tokens with
+	  [] -> true
+	| hd::tl -> valid_tokens_base ~unit hd tl
+
+
     (* the state is in rev order *)
     let cons_ans ~unit state ans_list =
       let tokens = tokens_of_state ~unit state in
+      assert( valid_tokens ~unit tokens );
       add_tokens tokens ans_list
 
     let folding_function unit entity ({state; ans_list } as current_folding) =
@@ -324,11 +363,6 @@ struct
 
   end
 
-  let possible_moves view =
-    let ans = PossibleMoves.calculate view in
-    ans.PossibleMoves.size, ans.PossibleMoves.content
-
-
   (* cor is considered to designate the front of line *)
   let playable local_cordinate view =
     let (x,y) = CordinateSystem.values local_cordinate in
@@ -341,6 +375,13 @@ struct
       then incr count
     done;
     !count = pred Param.connects
+
+
+  let possible_moves view =
+    let ans = PossibleMoves.calculate view in
+    let anslist = ans.PossibleMoves.content in
+    assert ( List.for_all (fun c -> playable c view) anslist );
+    ans.PossibleMoves.size, anslist
 
 
   let rec insertion_node_of_line_base local_cordinate view =
