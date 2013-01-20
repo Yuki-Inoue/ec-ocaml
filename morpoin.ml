@@ -93,6 +93,7 @@ sig
   val node_size : t -> int
   val first_range : t -> int * int
   val node_exist : [`Local] cordinate -> t -> bool
+  val insertion_node_of_line : [`Local] cordinate -> t -> [`Local] cordinate
 end
 
 
@@ -112,6 +113,16 @@ struct
     cordinate_system : CordinateSystem.t;
     entities : EntitySet.t
   }
+
+  (* assumes the line to be valid *)
+  let rec insertion_node_of_line local_cordinate view =
+    if not (EntitySet.mem (local_cordinate, Node) view.entities) then
+      local_cordinate
+    else
+      insertion_node_of_line
+	(CordinateSystem.up local_cordinate view.cordinate_system)
+	view
+
 
   type dirview_t = t
 
