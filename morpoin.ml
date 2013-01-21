@@ -12,6 +12,7 @@ sig
   val values : 'a cordinate -> (int * int)
   val cordinate_systems : t array
   val up : 'a cordinate -> t -> 'a cordinate
+  val print_cordinate : Format.formatter -> 'a cordinate -> unit
 end
 
 module CordinateSystem : CORDINATE_SYSTEM =
@@ -25,6 +26,11 @@ struct
     to_global : [`Local] cordinate -> [`Global] cordinate;
     unit : int
   }
+
+
+  let print_cordinate formatter (x,y) =
+    Format.fprintf formatter "(%d,%d)" x y
+
 
   let local_cordinate x = x
   let global_cordinate x = x
@@ -103,6 +109,7 @@ sig
   val node_exist : [`Local] cordinate -> t -> bool
   val nodes : t -> GlobalCordinateSet.t
   val insertion_node_of_line : [`Local] cordinate -> t -> [`Local] cordinate
+  val print_view : Format.formatter -> t -> unit
 end
 
 
@@ -418,8 +425,44 @@ struct
     first_value_of_entity (EntitySet.min_elt view.entities),
     first_value_of_entity (EntitySet.max_elt view.entities)
 
+
+  let second_range view =
+    let update_range value (bottom, top) =
+      (min bottom value, max top value)
+    in
+    EntitySet.fold
+      (fun (local_cordinate, _) ->
+	update_range
+	  (snd (CordinateSystem.values local_cordinate)))
+      view.entities
+      (max_int, min_int)
+
+
   let node_exist cor view =
     EntitySet.mem (cor,Node) view.entities
+
+  let ox_of_bool bool =
+    match bool with
+	true -> 'O'
+      | false -> 'X'
+
+  let print_view formatter view =
+    let (first_begin, first_end) = first_range view in
+    let (second_begin, second_end) = second_range view in
+    Format.pp_open_vbox formatter 0;
+    for i = first_begin to first_end do
+      for j = second_begin to second_end do
+	let local_cordinate =
+	  CordinateSystem.local_cordinate (i,j)
+	in
+	Format.pp_print_char formatter
+	  (ox_of_bool
+	     (node_exist local_cordinate view))
+      done;
+      Format.pp_print_cut formatter ()
+    done;
+    Format.pp_close_box formatter ()
+
 
 end
 
