@@ -4,3 +4,5 @@
 #install_printer Morpoin.D.print_action
 
 open Morpoin.D
+
+#use "test.ml"
