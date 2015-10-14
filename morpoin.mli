@@ -17,6 +17,7 @@ sig
   val initial : node
   val print_node : Format.formatter -> node -> unit
   val print_action : Format.formatter -> action -> unit
+  val string_of_action : action -> string
 end
 
 module Make : functor (Param : PARAM) -> S

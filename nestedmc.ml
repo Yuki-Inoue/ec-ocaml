@@ -2,7 +2,7 @@
 
 exception InvalidMove
 
-module MonteCarlo ( Game : AI.GAME ) =
+module MonteCarlo ( Game : AIGame.S ) =
 struct
 
   open Game
@@ -17,7 +17,7 @@ struct
 
   let rec nestedmc ?(moves:Game.action list = []) node lv : score * Game.action list =
     if lv = 0 then
-      random_play node
+      random_play ~moves node
     else
       let try_move (move : Game.action) : int * Game.action list=
 	nestedmc ~moves:(move::moves) (play node move) (lv-1)

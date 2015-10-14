@@ -2,15 +2,23 @@
 
 .PHONY: all
 
-all: morpoin.cmo
+OBJS = AIGame.cmo morpoin.cmo nestedmc.cmo playMorpoin.cmo
+DEBUG = -g
 
-morpoin.cmo : AIGame.cmo morpoin.cmi
+playMorpoin: $(OBJS)
+	ocamlc $(DEBUG) -o $@ $(OBJS)
+
+all: morpoin.cmo nestedmc.cmo playMorpoin.cmo
+
 
 %.cmi : %.mli
-	ocamlc -c $<
+	ocamlc -c $(DEBUG) $<
 
 %.cmo : %.ml
-	ocamlc -c $<
+	ocamlc -c $(DEBUG) $<
 
 clean:
 	rm $(wildcard *.cmo) $(wildcard *.cmi)
+
+
+include .depend

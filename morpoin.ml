@@ -12,6 +12,7 @@ sig
   val values : 'a cordinate -> (int * int)
   val cordinate_systems : t array
   val up : 'a cordinate -> t -> 'a cordinate
+  val print_cordinate : Format.formatter -> 'a cordinate -> unit
 end
 
 module CordinateSystem : CORDINATE_SYSTEM =
@@ -25,6 +26,11 @@ struct
     to_global : [`Local] cordinate -> [`Global] cordinate;
     unit : int
   }
+
+
+  let print_cordinate formatter (x,y) =
+    Format.fprintf formatter "(%d,%d)" x y
+
 
   let local_cordinate x = x
   let global_cordinate x = x
@@ -103,6 +109,7 @@ sig
   val node_exist : [`Local] cordinate -> t -> bool
   val nodes : t -> GlobalCordinateSet.t
   val insertion_node_of_line : [`Local] cordinate -> t -> [`Local] cordinate
+  val print_view : Format.formatter -> t -> unit
 end
 
 
@@ -248,6 +255,22 @@ struct
 	    [{cordinate = x, y+unit; node_exist = false}]
 	    c cs
 
+    let eligible_for_line token_list =
+      List.fold_left
+	(fun count token ->
+	  if token.node_exist
+	  then succ count
+	  else count)
+	0 token_list = pred Param.connects
+
+    let popped_and_queue_eligible popped queue =
+      eligible_for_line
+	(popped ::
+	   (List.rev
+	      (Queue.fold
+		 (fun obj elm -> elm :: obj)
+		 [] queue)))
+
 
     (* queue: sized less than Param.connects *)
     let rec add_tokens_base node_count queue tokens sized_list =
@@ -260,14 +283,16 @@ struct
 	  if node_exist then incr node_count;
 	  if Queue.length queue = Param.connects then begin
 	    let popped = Queue.pop queue in
-	    if !node_count = Param.connects - 1 then
+	    if !node_count = Param.connects - 1 then begin
+	      assert (popped_and_queue_eligible popped queue);
 	      newlist := {
 		size =
 		  succ sized_list.size;
 		content =
 		  CordinateSystem.local_cordinate
 		    popped.cordinate :: sized_list.content
-	      };
+	      }
+	    end;
 	    if popped.node_exist then decr node_count
 	  end;
 	  add_tokens_base !node_count queue rest_of_tokens !newlist
@@ -278,9 +303,30 @@ struct
       add_tokens_base 0 (Queue.create ()) tokens list
 
 
+    let tokens_adjacent ~unit smaller bigger =
+      let (x0,y0) = smaller.cordinate in
+      let (x1,y1) = bigger.cordinate in
+      x0 = x1 && y0 + unit = y1
+
+
+    let rec valid_tokens_base ~unit top_token rest_tokens =
+      match rest_tokens with
+	  [] -> true
+	| hd_token::tail_tokens ->
+	  (top_token.node_exist || hd_token.node_exist)
+	  && tokens_adjacent ~unit top_token hd_token
+	  && valid_tokens_base ~unit hd_token tail_tokens
+
+    let valid_tokens ~unit tokens =
+      match tokens with
+	  [] -> true
+	| hd::tl -> valid_tokens_base ~unit hd tl
+
+
     (* the state is in rev order *)
     let cons_ans ~unit state ans_list =
       let tokens = tokens_of_state ~unit state in
+      assert( valid_tokens ~unit tokens );
       add_tokens tokens ans_list
 
     let folding_function unit entity ({state; ans_list } as current_folding) =
@@ -324,11 +370,6 @@ struct
 
   end
 
-  let possible_moves view =
-    let ans = PossibleMoves.calculate view in
-    ans.PossibleMoves.size, ans.PossibleMoves.content
-
-
   (* cor is considered to designate the front of line *)
   let playable local_cordinate view =
     let (x,y) = CordinateSystem.values local_cordinate in
@@ -341,6 +382,13 @@ struct
       then incr count
     done;
     !count = pred Param.connects
+
+
+  let possible_moves view =
+    let ans = PossibleMoves.calculate view in
+    let anslist = ans.PossibleMoves.content in
+    assert ( List.for_all (fun c -> playable c view) anslist );
+    ans.PossibleMoves.size, anslist
 
 
   let rec insertion_node_of_line_base local_cordinate view =
@@ -377,8 +425,44 @@ struct
     first_value_of_entity (EntitySet.min_elt view.entities),
     first_value_of_entity (EntitySet.max_elt view.entities)
 
+
+  let second_range view =
+    let update_range value (bottom, top) =
+      (min bottom value, max top value)
+    in
+    EntitySet.fold
+      (fun (local_cordinate, _) ->
+	update_range
+	  (snd (CordinateSystem.values local_cordinate)))
+      view.entities
+      (max_int, min_int)
+
+
   let node_exist cor view =
     EntitySet.mem (cor,Node) view.entities
+
+  let ox_of_bool bool =
+    match bool with
+	true -> 'O'
+      | false -> 'X'
+
+  let print_view formatter view =
+    let (first_begin, first_end) = first_range view in
+    let (second_begin, second_end) = second_range view in
+    Format.pp_open_vbox formatter 0;
+    for i = first_begin to first_end do
+      for j = second_begin to second_end do
+	let local_cordinate =
+	  CordinateSystem.local_cordinate (i,j)
+	in
+	Format.pp_print_char formatter
+	  (ox_of_bool
+	     (node_exist local_cordinate view))
+      done;
+      Format.pp_print_cut formatter ()
+    done;
+    Format.pp_close_box formatter ()
+
 
 end
 
@@ -394,6 +478,7 @@ sig
   val initial : node
   val print_node : Format.formatter -> node -> unit
   val print_action : Format.formatter -> action -> unit
+  val string_of_action : action -> string
 end
 
 (* satisfied AI.GAME *)
@@ -415,8 +500,7 @@ struct
     (DirView.cordinate_system_of_view view).
       CordinateSystem.to_global local_cordinate
 
-
-  let print_action formatter (dir, cord : action) =
+  let string_of_action (dir, cord : action) =
     let cordinate_system =
       CordinateSystem.cordinate_systems.(dir)
     in
@@ -424,9 +508,14 @@ struct
       cordinate_system.CordinateSystem.to_global cord
     in
     let (x,y) = CordinateSystem.values global_cordinate in
+    Printf.sprintf "(dir%i:(%i,%i))" dir x y
+
+
+
+  let print_action formatter action =
     Format.pp_print_string
       formatter
-      (Printf.sprintf "(dir%i:(%i,%i))" dir x y)
+      (string_of_action action)
 
   let add_node global_cordinate views =
     Array.map
@@ -503,7 +592,7 @@ struct
     in
     let r = ref (Random.int totalmoves) in
     let index = ref 0 in
-    while fst dir_moves.(!index) < !r do
+    while fst dir_moves.(!index) <= !r do
       r := !r - fst dir_moves.(!index);
       incr index;
     done;
@@ -528,7 +617,7 @@ struct
 	 dir_possible_moves)
 
   let terminal node =
-    List.exists DirView.move_exist (Array.to_list node)
+    not (List.exists DirView.move_exist (Array.to_list node))
 
   let score views =
     DirView.num_nodes views.(0)
